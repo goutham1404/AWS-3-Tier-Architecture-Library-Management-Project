@@ -1,0 +1,69 @@
+<!-- frontend/index.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Library Management</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:24px}
+    .book{border:1px solid #ddd;padding:12px;margin:8px 0;border-radius:6px}
+    button{margin-left:8px}
+  </style>
+</head>
+<body>
+  <h1>Library Management (Demo)</h1>
+  <div>
+    <input id="search" placeholder="search title/author"/>
+    <button onclick="loadBooks()">Search</button>
+  </div>
+  <div id="books"></div>
+
+<script>
+const API_BASE = '/api'; // NGINX will reverse proxy /api to app tier
+
+async function loadBooks(){
+  const q = document.getElementById('search').value;
+  const res = await fetch(API_BASE + '/books' + (q ? '?q=' + encodeURIComponent(q) : ''));
+  const books = await res.json();
+  const container = document.getElementById('books');
+  container.innerHTML = '';
+  books.forEach(b=>{
+    const el = document.createElement('div');
+    el.className = 'book';
+    el.innerHTML = `<strong>${escapeHtml(b.title)}</strong> — ${escapeHtml(b.author)}
+      <div>Available: ${b.available}</div>
+      <div style="margin-top:8px">
+        <button onclick="borrow(${b.id})" ${b.available? '':'disabled'}>Borrow</button>
+        <button onclick="returnBook(${b.id})">Return</button>
+      </div>`;
+    container.appendChild(el);
+  });
+}
+
+async function borrow(id){
+  const res = await fetch(API_BASE + '/loans', {
+    method: 'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({bookId: id, userId: 1})
+  });
+  if(res.ok) loadBooks();
+  else alert('Failed to borrow');
+}
+
+async function returnBook(id){
+  const res = await fetch(API_BASE + '/loans/return', {
+    method: 'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({bookId: id, userId: 1})
+  });
+  if(res.ok) loadBooks();
+  else alert('Failed to return');
+}
+
+function escapeHtml(s){ return s? s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]) : ''; }
+
+window.onload = loadBooks;
+</script>
+</body>
+</html>
